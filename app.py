@@ -2,18 +2,21 @@ import streamlit as st
 import pandas as pd
 import psycopg2
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# -------------------------
+# Database Connection
+# -------------------------
+def get_connection():
+    return psycopg2.connect(
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT"),
+        sslmode="require"   # 🔥 REQUIRED for Neon
+    )
 
-
-conn = psycopg2.connect(
-    database=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST"),
-    port=os.getenv("DB_PORT")
-)
+conn = get_connection()
 
 st.title("🎾 Tennis Data Analytics Dashboard")
 
@@ -22,7 +25,9 @@ menu = st.sidebar.selectbox(
     ["Dashboard", "Competitions", "Venues", "Competitor Rankings"]
 )
 
+# -------------------------
 # Dashboard
+# -------------------------
 if menu == "Dashboard":
 
     competitors = pd.read_sql("SELECT COUNT(*) as total FROM competitors", conn)
@@ -36,7 +41,9 @@ if menu == "Dashboard":
     col3.metric("Total Venues", venues.iloc[0]["total"])
 
 
+# -------------------------
 # Competitions
+# -------------------------
 elif menu == "Competitions":
 
     query = """
@@ -45,6 +52,7 @@ elif menu == "Competitions":
     JOIN categories cat
     ON c.category_id = cat.category_id
     GROUP BY cat.category_name
+    ORDER BY total_competitions DESC
     """
 
     df = pd.read_sql(query, conn)
@@ -53,7 +61,9 @@ elif menu == "Competitions":
     st.bar_chart(df.set_index("category_name"))
 
 
+# -------------------------
 # Venues
+# -------------------------
 elif menu == "Venues":
 
     query = """
@@ -62,6 +72,7 @@ elif menu == "Venues":
     JOIN venues v
     ON c.complex_id = v.complex_id
     GROUP BY c.complex_name
+    ORDER BY total_venues DESC
     """
 
     df = pd.read_sql(query, conn)
@@ -70,7 +81,9 @@ elif menu == "Venues":
     st.bar_chart(df.set_index("complex_name"))
 
 
+# -------------------------
 # Rankings
+# -------------------------
 elif menu == "Competitor Rankings":
 
     query = """
@@ -95,7 +108,7 @@ elif menu == "Competitor Rankings":
         FROM competitor_rankings r
         JOIN competitors comp
         ON r.competitor_id = comp.competitor_id
-        WHERE comp.name LIKE '%{name}%'
+        WHERE comp.name ILIKE '%{name}%'
         """
 
         result = pd.read_sql(search_query, conn)
