@@ -1,18 +1,17 @@
 import streamlit as st
 import pandas as pd
 import psycopg2
-import os
 
 # -------------------------
-# Database Connection
+# Database Connection (FIXED)
 # -------------------------
 def get_connection():
     return psycopg2.connect(
-        database=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT"),
+        database=st.secrets["DB_NAME"],
+        user=st.secrets["DB_USER"],
+        password=st.secrets["DB_PASSWORD"],
+        host=st.secrets["DB_HOST"],
+        port=st.secrets["DB_PORT"],
         sslmode="require"   # 🔥 REQUIRED for Neon
     )
 
