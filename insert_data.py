@@ -1,4 +1,6 @@
 import os
+print("🚀 Script started...")
+
 import requests
 import psycopg2
 from dotenv import load_dotenv
@@ -16,37 +18,50 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 
-try:
+print("DB_HOST:", DB_HOST)
+print("DB_NAME:", DB_NAME)
 
+try:
     # -------------------------
-    # Connect to PostgreSQL
+    # Connect to Neon PostgreSQL
     # -------------------------
     conn = psycopg2.connect(
         database=DB_NAME,
         user=DB_USER,
         password=DB_PASSWORD,
         host=DB_HOST,
-        port=DB_PORT
+        port=DB_PORT,
+        sslmode="require"
     )
+
+    print("✅ Connected to Neon!")
 
     cursor = conn.cursor()
 
     # ======================================================
     # 1️⃣ Fetch Competitions
     # ======================================================
+    print("\n📡 Fetching competitions...")
 
     competitions_url = f"https://api.sportradar.com/tennis/trial/v3/en/competitions.json?api_key={API_KEY}"
     competitions_response = requests.get(competitions_url)
 
+    print("Status Code:", competitions_response.status_code)
+
     if competitions_response.status_code != 200:
-        raise Exception("Failed to fetch competitions from API")
+        print(competitions_response.text)
+        raise Exception("❌ Failed to fetch competitions")
 
     competitions_data = competitions_response.json()
 
+    print("Total competitions from API:", len(competitions_data.get("competitions", [])))
+
+    count = 0
+
     for comp in competitions_data.get("competitions", []):
+        count += 1
 
         category = comp.get("category", {})
-
         category_id = category.get("id")
         category_name = category.get("name", "Unknown")
 
@@ -71,19 +86,33 @@ try:
             category_id
         ))
 
+        if count % 100 == 0:
+            print(f"✅ Inserted {count} competitions...")
+            conn.commit()
+
+    print(f"🎯 Total competitions inserted: {count}")
+
     # ======================================================
     # 2️⃣ Fetch Complexes
     # ======================================================
+    print("\n📡 Fetching complexes...")
 
     complexes_url = f"https://api.sportradar.com/tennis/trial/v3/en/complexes.json?api_key={API_KEY}"
     complexes_response = requests.get(complexes_url)
 
+    print("Status Code:", complexes_response.status_code)
+
     if complexes_response.status_code != 200:
-        raise Exception("Failed to fetch complexes from API")
+        print(complexes_response.text)
+        raise Exception("❌ Failed to fetch complexes")
 
     complexes_data = complexes_response.json()
 
+    compx_count = 0
+    venue_count = 0
+
     for compx in complexes_data.get("complexes", []):
+        compx_count += 1
 
         cursor.execute("""
             INSERT INTO Complexes (complex_id, complex_name)
@@ -95,6 +124,7 @@ try:
         ))
 
         for venue in compx.get("venues", []):
+            venue_count += 1
 
             cursor.execute("""
                 INSERT INTO Venues
@@ -111,23 +141,33 @@ try:
                 compx.get("id")
             ))
 
+        if compx_count % 50 == 0:
+            print(f"🏟️ Complexes: {compx_count}, Venues: {venue_count}")
+            conn.commit()
+
     # ======================================================
     # 3️⃣ Fetch Rankings
     # ======================================================
+    print("\n📡 Fetching rankings...")
 
     rankings_url = f"https://api.sportradar.com/tennis/trial/v3/en/rankings.json?api_key={API_KEY}"
     rankings_response = requests.get(rankings_url)
 
+    print("Status Code:", rankings_response.status_code)
+
     if rankings_response.status_code != 200:
-        raise Exception("Failed to fetch rankings from API")
+        print(rankings_response.text)
+        raise Exception("❌ Failed to fetch rankings")
 
     rankings_data = rankings_response.json()
 
+    rank_count = 0
+
     for ranking in rankings_data.get("rankings", []):
         for comp_rank in ranking.get("competitor_rankings", []):
+            rank_count += 1
 
             competitor = comp_rank.get("competitor", {})
-
             competitor_id = competitor.get("id")
 
             cursor.execute("""
@@ -155,15 +195,19 @@ try:
                 competitor_id
             ))
 
+        if rank_count % 100 == 0:
+            print(f"📊 Inserted {rank_count} rankings...")
+            conn.commit()
+
     # -------------------------
-    # Commit changes
+    # Final commit
     # -------------------------
     conn.commit()
 
     cursor.close()
     conn.close()
 
-    print("API data inserted successfully!")
+    print("\n🎉 ALL DATA INSERTED SUCCESSFULLY!")
 
 except Exception as e:
-    print("Error:", e)
+    print("❌ ERROR:", e)
